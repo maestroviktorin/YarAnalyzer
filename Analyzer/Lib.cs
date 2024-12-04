@@ -179,6 +179,15 @@ namespace Analyzer
         }
     }
 
+    public class SyntaxException : Exception
+    {
+        public SyntaxException(string message) : base(message) { }
+    }
+    public class SemanticException : Exception
+    {
+        public SemanticException(string message) : base(message) { }
+    }
+
     public class Parser
     {
         private Lexer lexer;
@@ -207,9 +216,13 @@ namespace Analyzer
                 Console.WriteLine("Анализ успешно завершен.");
                 return new ParseSuccess(GetTable());
             }
-            catch (Exception ex)
+            catch (SyntaxException ex)
             {
-                return new ParseError(GetError(ex.Message, currentToken.Position));
+                return new ParseError(GetError(true, ex.Message, currentToken.Position));
+            }
+            catch (SemanticException ex)
+            {
+                return new ParseError(GetError(false, ex.Message, currentToken.Position));
             }
         }
 
@@ -241,11 +254,11 @@ namespace Analyzer
                 int position = currentToken.Position;
                 // Проверка длины идентификатора и зарезервированных слов
                 if (name.Length > 8)
-                    throw new Exception($"Идентификатор '{name}' превышает допустимую длину (8 символов)");
+                    throw new SemanticException($"Идентификатор '{name}' превышает допустимую длину (8 символов)");
                 if (reservedWords.Contains(name))
-                    throw new Exception($"Идентификатор '{name}' не может быть зарезервированным словом");
+                    throw new SemanticException($"Идентификатор '{name}' не может быть зарезервированным словом");
                 if (declaredIdentifiers.Contains(name))
-                    throw new Exception($"Идентификатор '{name}' уже объявлен");
+                    throw new SemanticException($"Идентификатор '{name}' уже объявлен");
 
                 identifier.Name = name;
                 declaredIdentifiers.Add(name);
@@ -262,7 +275,7 @@ namespace Analyzer
                     }
                     else
                     {
-                        throw new Exception("Ожидалось указание типа после ':'");
+                        throw new SyntaxException("Ожидалось указание типа после ':'");
                     }
                 }
 
@@ -276,7 +289,7 @@ namespace Analyzer
             }
             else
             {
-                throw new Exception("Ожидался идентификатор");
+                throw new SyntaxException("Ожидался идентификатор");
             }
         }
 
@@ -287,7 +300,6 @@ namespace Analyzer
                 case TokenType.STRING_LITERAL:
                     {
                         string value = currentToken.Value;
-                        Consume(TokenType.STRING_LITERAL);
                         if (string.IsNullOrEmpty(identifier.Type))
                         {
                             // Если тип не указан, предполагаем STRING
@@ -296,18 +308,19 @@ namespace Analyzer
                         if (identifier.Type == "STRING")
                         {
                             if (value.Length > 256)
-                                throw new Exception($"Строковая константа превышает допустимую длину (256 символов)");
+                                throw new SemanticException($"Строковая константа превышает допустимую длину (256 символов)");
                         }
                         else if (identifier.Type == "CHAR")
                         {
                             if (value.Length != 1)
-                                throw new Exception($"CHAR константа должна содержать один символ");
+                                throw new SemanticException($"CHAR константа должна содержать один символ");
                         }
                         else
                         {
-                            throw new Exception($"Тип '{identifier.Type}' несовместим со строковым значением");
+                            throw new SemanticException($"Тип '{identifier.Type}' несовместим со строковым значением");
                         }
                         identifier.Value = $"'{value}'";
+                        Consume(TokenType.STRING_LITERAL);
                         break;
                     }
                 case TokenType.INTEGER_LITERAL:
@@ -315,7 +328,6 @@ namespace Analyzer
                     {
                         string value = currentToken.Value;
                         bool isReal = currentToken.Type == TokenType.REAL_LITERAL;
-                        Consume(currentToken.Type);
                         if (string.IsNullOrEmpty(identifier.Type))
                         {
                             // Если тип не указан, предполагаем INTEGER или REAL
@@ -324,31 +336,32 @@ namespace Analyzer
                         if (identifier.Type == "INTEGER")
                         {
                             if (isReal)
-                                throw new Exception("Ожидалось целое число для типа INTEGER");
+                                throw new SemanticException("Ожидалось целое число для типа INTEGER");
                             if (!int.TryParse(value, out int intValue) || intValue < -32768 || intValue > 32767)
-                                throw new Exception("Значение INTEGER выходит за допустимый диапазон (-32768 до 32767)");
+                                throw new SemanticException("Значение INTEGER выходит за допустимый диапазон (-32768 до 32767)");
                         }
                         else if (identifier.Type == "WORD")
                         {
                             if (isReal)
-                                throw new Exception("Ожидалось целое число для типа WORD");
+                                throw new SemanticException("Ожидалось целое число для типа WORD");
                             if (!int.TryParse(value, out int intValue) || intValue < 0 || intValue > 256)
-                                throw new Exception("Значение WORD выходит за допустимый диапазон (0 до 256)");
+                                throw new SemanticException("Значение WORD выходит за допустимый диапазон (0 до 256)");
                         }
                         else if (identifier.Type == "REAL")
                         {
                             if (!double.TryParse(value.Replace('.', ','), out _))
-                                throw new Exception("Некорректное вещественное число");
+                                throw new SemanticException("Некорректное вещественное число");
                         }
                         else
                         {
-                            throw new Exception($"Тип '{identifier.Type}' несовместим с числовым значением");
+                            throw new SemanticException($"Тип '{identifier.Type}' несовместим с числовым значением");
                         }
                         identifier.Value = value;
+                        Consume(currentToken.Type);
                         break;
                     }
                 default:
-                    throw new Exception("Ожидалось значение константы");
+                    throw new SyntaxException("Ожидалось значение константы");
             }
         }
 
@@ -366,7 +379,7 @@ namespace Analyzer
         private void Expect(TokenType type, string errorMessage)
         {
             if (currentToken.Type != type)
-                throw new Exception(errorMessage);
+                throw new SyntaxException(errorMessage);
         }
 
         // Потребление токена
@@ -375,29 +388,26 @@ namespace Analyzer
             if (currentToken.Type == type)
             {
                 currentToken = lexer.GetNextToken();
-                // Пропускаем пробелы и учитываем регистр
-                while (currentToken.Type == TokenType.RESERVED_WORD)
-                {
-                    if (currentToken.Value.Equals(" ", StringComparison.OrdinalIgnoreCase))
-                    {
-                        currentToken = lexer.GetNextToken();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
             }
             else
             {
-                throw new Exception($"Ожидался '{type}', найдено '{currentToken.Type}'");
+                throw new SyntaxException($"Ожидался '{type}', найдено '{currentToken.Type}'");
             }
         }
 
         // Сообщение об ошибке с указанием позиции
-        private string GetError(string message, int position)
+        private string GetError(bool errorType, string message, int position)
         {
-            string result = $"Ошибка: {message}\r\n";
+            string result;
+            if (errorType)
+            {
+                result = $"Синтаксическая ошибка: {message}\r\n";
+            }
+            else
+            {
+                result = $"Семантическая ошибка: {message}\r\n";
+            }
+
             result += input + "\r\n";
             result += new string(' ', position) + "^";
 
@@ -408,10 +418,10 @@ namespace Analyzer
         private string GetTable()
         {
             string result = "Таблица идентификаторов и констант:\r\n";
-            result += "Имя\tТип\tЗначение\r\n";
+            result += "Имя     \tТип     \tЗначение\r\n";
             foreach (var id in _identifiers)
             {
-                result += $"{id.Name}\t{id.Type}\t{id.Value}\r\n";
+                result += $"{id.Name.PadRight(8, ' ')}\t{id.Type.PadRight(8, ' ')}\t{id.Value}\r\n";
             }
 
             return result;
