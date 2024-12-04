@@ -39,6 +39,8 @@
             {
                 semanticsButton.Enabled = false;
                 analyzeOutputTextBox.Text = (parseResult as ParseError).Message;
+                inputTextBox.Select(parseResult.Position, 0);
+                inputTextBox.Focus();
             }
         }
 

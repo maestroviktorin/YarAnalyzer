@@ -159,25 +159,20 @@ namespace Analyzer
         public string Value { get; set; }
     }
 
-    public abstract class ParseResult { }
-
-    public class ParseSuccess : ParseResult
-    {
+    public abstract class ParseResult {
         public string Message { get; set; }
-        public ParseSuccess(string message)
+        public int Position { get; set; }
+
+        public ParseResult(string message, int position)
         {
             Message = message;
+            Position = position;
         }
     }
 
-    public class ParseError : ParseResult
-    {
-        public string Message { get; set; }
-        public ParseError(string message)
-        {
-            Message = message;
-        }
-    }
+    public class ParseSuccess(string message, int position) : ParseResult(message, position) { }
+
+    public class ParseError(string message, int position) : ParseResult(message, position) { }
 
     public class SyntaxException : Exception
     {
@@ -214,15 +209,15 @@ namespace Analyzer
             {
                 ParseConstDeclaration();
                 Console.WriteLine("Анализ успешно завершен.");
-                return new ParseSuccess(GetTable());
+                return new ParseSuccess(GetTable(), currentToken.Position);
             }
             catch (SyntaxException ex)
             {
-                return new ParseError(GetError(true, ex.Message, currentToken.Position));
+                return new ParseError(GetError(true, ex.Message, currentToken.Position), currentToken.Position);
             }
             catch (SemanticException ex)
             {
-                return new ParseError(GetError(false, ex.Message, currentToken.Position));
+                return new ParseError(GetError(false, ex.Message, currentToken.Position), currentToken.Position);
             }
         }
 
