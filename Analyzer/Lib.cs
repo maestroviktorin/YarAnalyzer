@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace Analyzer
 {
-    // Перечисление типов токенов
+    // Перечисление типов токенов.
     public enum TokenType
     {
         IDENTIFIER,
@@ -21,6 +21,7 @@ namespace Analyzer
         ERROR
     }
 
+    // Описание токена.
     public class Token
     {
         public TokenType Type { get; set; }
@@ -59,7 +60,7 @@ namespace Analyzer
 
             char currentChar = input[position];
 
-            // Идентификатор или зарезервированное слово
+            // Идентификатор или зарезервированное слово.
             if (char.IsLetter(currentChar))
             {
                 int startPos = position;
@@ -74,7 +75,7 @@ namespace Analyzer
                 return new Token { Type = type, Value = lexeme, Position = startPos };
             }
 
-            // Числовая константа
+            // Числовая константа.
             if (char.IsDigit(currentChar))
             {
                 int startPos = position;
@@ -86,7 +87,7 @@ namespace Analyzer
                     {
                         if (hasDecimalPoint)
                         {
-                            // Ошибка: более одной десятичной точки
+                            // Ошибка: более одной десятичной точки.
                             return new Token { Type = TokenType.ERROR, Value = "Некорректная числовая константа", Position = startPos };
                         }
                         hasDecimalPoint = true;
@@ -102,8 +103,8 @@ namespace Analyzer
                 };
             }
 
-            // Строковая константа
-            if (currentChar == '\'' || currentChar == '‘' || currentChar == '’') // Учитываем разные виды кавычек
+            // Строковая константа.
+            if (currentChar == '\'' || currentChar == '‘' || currentChar == '’') // Разные виды кавычек.
             {
                 int startPos = position;
                 char quoteChar = '\'';
@@ -117,14 +118,14 @@ namespace Analyzer
                 }
                 if (position >= input.Length || input[position] != quoteChar)
                 {
-                    // Ошибка: незакрытая строка
+                    // Ошибка: незакрытая строка.
                     return new Token { Type = TokenType.ERROR, Value = "Незакрытая строковая константа", Position = startPos };
                 }
-                position++; // Пропустить закрывающую кавычку
+                position++;
                 return new Token { Type = TokenType.STRING_LITERAL, Value = sb.ToString(), Position = startPos };
             }
 
-            // Символы
+            // Знаки.
             switch (currentChar)
             {
                 case ':':
@@ -140,11 +141,12 @@ namespace Analyzer
                     position++;
                     return new Token { Type = TokenType.SEMICOLON, Value = ";", Position = position - 1 };
                 default:
-                    // Неизвестный символ
+                    // Неизвестный символ.
                     return new Token { Type = TokenType.ERROR, Value = $"Неизвестный символ '{currentChar}'", Position = position++ };
             }
         }
 
+        // Пропуск пробелов до следующего токена.
         private void SkipWhitespace()
         {
             while (position < input.Length && char.IsWhiteSpace(input[position]))
@@ -152,6 +154,7 @@ namespace Analyzer
         }
     }
 
+    // Описание идентификатора с его значением.
     public class IdentifierInfo
     {
         public string Name { get; set; }
@@ -159,6 +162,7 @@ namespace Analyzer
         public string Value { get; set; }
     }
 
+    // Результат разбора: либо успех, либо ошибка, возникшая в определённом месте.
     public abstract class ParseResult {
         public string Message { get; set; }
         public int Position { get; set; }
@@ -202,7 +206,6 @@ namespace Analyzer
             currentToken = lexer.GetNextToken();
         }
 
-        // Начать разбор
         public ParseResult Parse()
         {
             try
@@ -231,7 +234,7 @@ namespace Analyzer
 
         private void ParseDescriptionList()
         {
-            Consume(TokenType.RESERVED_WORD); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            Consume(TokenType.RESERVED_WORD);
             ParseDescription();
             while (currentToken.Type == TokenType.COMMA)
             {
@@ -248,7 +251,7 @@ namespace Analyzer
             {
                 string name = currentToken.Value;
                 int position = currentToken.Position;
-                // Проверка длины идентификатора и зарезервированных слов
+                // Проверка длины идентификатора и зарезервированных слов.
                 if (name.Length > 8)
                     throw new SemanticException($"Идентификатор '{name}' превышает допустимую длину (8 символов)");
                 if (reservedWords.Contains(name))
@@ -260,7 +263,7 @@ namespace Analyzer
                 declaredIdentifiers.Add(name);
                 Consume(TokenType.IDENTIFIER);
 
-                // Проверка на наличие типа
+                // Проверка на наличие типа, если есть `:`.
                 if (currentToken.Type == TokenType.COLON)
                 {
                     Consume(TokenType.COLON);
@@ -275,11 +278,9 @@ namespace Analyzer
                     }
                 }
 
-                // Ожидается '='
                 Expect(TokenType.EQUAL, "Ожидалось '='");
                 Consume(TokenType.EQUAL);
 
-                // Разбор значения
                 ParseValue(identifier);
                 _identifiers.Add(identifier);
             }
@@ -298,7 +299,7 @@ namespace Analyzer
                         string value = currentToken.Value;
                         if (string.IsNullOrEmpty(identifier.Type))
                         {
-                            // Если тип не указан, предполагаем STRING
+                            // Если тип не указан, по умолчанию `STRING`.
                             identifier.Type = "STRING";
                         }
                         if (identifier.Type == "STRING")
@@ -326,7 +327,6 @@ namespace Analyzer
                         bool isReal = currentToken.Type == TokenType.REAL_LITERAL;
                         if (string.IsNullOrEmpty(identifier.Type))
                         {
-                            // Если тип не указан, предполагаем INTEGER или REAL
                             identifier.Type = isReal ? "REAL" : "INTEGER";
                         }
                         if (identifier.Type == "INTEGER")
@@ -361,7 +361,7 @@ namespace Analyzer
             }
         }
 
-        // Проверка, является ли строка допустимым типом
+        // Проверка, является ли лексема допустимым типом данных.
         private bool IsType(string lexeme)
         {
             return lexeme.Equals("STRING", StringComparison.OrdinalIgnoreCase) ||
@@ -371,14 +371,14 @@ namespace Analyzer
                    lexeme.Equals("CHAR", StringComparison.OrdinalIgnoreCase);
         }
 
-        // Ожидание определенного типа токена
+        // Ожидание определенного типа токена.
         private void Expect(TokenType type, string errorMessage)
         {
             if (currentToken.Type != type)
                 throw new SyntaxException(errorMessage);
         }
 
-        // Потребление токена
+        // Потребление токена.
         private void Consume(TokenType type)
         {
             if (currentToken.Type == type)
@@ -391,7 +391,7 @@ namespace Analyzer
             }
         }
 
-        // Сообщение об ошибке с указанием позиции
+        // Сообщение об ошибке с указанием позиции и её типа.
         private string GetError(bool errorType, string message, int position)
         {
             string result;
@@ -410,7 +410,7 @@ namespace Analyzer
             return result;
         }
 
-        // Вывод таблиц идентификаторов и констант
+        // Вывод таблиц идентификаторов и констант.
         private string GetTable()
         {
             string result = "Таблица идентификаторов и констант:\r\n";
