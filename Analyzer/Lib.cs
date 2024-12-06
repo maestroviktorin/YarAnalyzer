@@ -223,7 +223,8 @@ namespace Analyzer
 
         private void ParseConstDeclaration()
         {
-            Expect(TokenType.RESERVED_WORD, "Ожидалось 'CONST'");
+            if (currentToken.Type != TokenType.RESERVED_WORD || currentToken.Value.ToUpper() != "CONST")
+                throw new SyntaxException("Ожидалось CONST");
             ParseDescriptionList();
             Expect(TokenType.SEMICOLON, "Ожидалась ';'");
         }
