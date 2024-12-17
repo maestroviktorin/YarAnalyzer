@@ -286,7 +286,13 @@ namespace Analyzer
             }
             else
             {
-                throw new SyntaxException("Ожидался идентификатор");
+                if (currentToken.Type == TokenType.INTEGER_LITERAL)
+                {
+                    throw new SemanticException("Идентификатор не может начинаться с цифры");
+                }
+                else {
+                    throw new SyntaxException("Ожидался идентификатор");
+                }
             }
         }
 
